@@ -2,4 +2,6 @@ Dynamic Heuristic Optimisation in High-Order Runge-Kutta Schemes using Reinforce
 
 This repository contains code accompanying the paper:
 
-Dynamic Heuristic Optimisation in High-Order Runge-Kutta Schemes using Reinforcement Learning and Genetic Algorithms https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5025337
+Dynamic Heuristic Optimisation in High-Order Runge-Kutta Schemes using Reinforcement Learning and Genetic Algorithms.
+
+The symbolic verification from the paper tests whether the Heuristics scale in this study we start from 15 stages and go up to 30 stages in increments of 3 stages.
