@@ -2,59 +2,51 @@ from __future__ import division
 """
 Runge–Kutta (ESRK) search                  
 ======================================================
-* **Exploration**  – every outer loop we create a brand‑new random heuristic
+* **Exploration**  – every outer loop we create a brand-new random heuristic
   constraint (or mutate an older one) and random starting coefficients.
-* **Exploitation** – IPOPT tries to minimise the internal‑stability
+* **Exploitation** – IPOPT tries to minimise the internal-stability
   objective given that heuristic.
 * **Restart**      – regardless of success/failure we immediately go back
   to Exploration, so the cycle continues.
 * We **collect** any heuristic whose random start already satisfies the
-  Butcher‑stability pre‑screen; once we have `stable_target` of them we
+  Butcher-stability pre-screen; once we have `stable_target` of them we
   stop.
 
-This file is self‑contained: run it with
+This file is self-contained: run it with
 
     python rk_search.py --seed 42
 
 and you should reproduce the numbers reported in the manuscript on any
 machine with IPOPT & MA27.
-
-For the huestrics in the paper a stand alone notebook with results and tableaus 
-will be provided this will contain all info needed and notebook to run them 
 """
 
-# ---------------------------------------------------------------------------
-# 0.  Imports & global beta data                                                
-# ---------------------------------------------------------------------------
 import json, random, time, argparse, sys
 import numpy as np
 import sympy as sym
 import pyomo.environ as pyo
+import re 
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
-# ---- reference SSP‑RK β values --------------------------------------------
+# ---- reference SSP-RK β values --------------------------------------------
 _BETA = np.array([
-    7.2362092230726359621444062630453895436513878479204372239744118914339008361957274894021123680041692242e+01,
+    7.2362092230726359621444062630453895436513878479204372e+01,
     1.0, 1.0, 0.5, 1/6,
-    3.30278406028757527979332298466336725484247797530949148541780288765549097681738463834524909538164545e-02,
-    4.0788675461517543025407589082899561446180084150021384558306497480447059168658653272938025859312818e-03,
-    3.33527373172737242603705467098764792409315403431559178662909610705332831105918682590799425317677283e-04,
-    1.88438744545771964992699112477377463925568623266923890807654445539507743132813283375146121935597446e-05,
-    7.55565600673228187844472799772168548435456673497418681132813388498239377614064205083716425567987086e-07,
-    2.180674889659337806106474225333623253164152989661516940939984945939720123180192751320554488732457046e-08,
-    4.543295752073872095310410708039457390472975268776849051520e-10,
-    6.76964099198340395235741216662494203744813306696814739898497900746954960650250467206606180555417237e-12,
-    7.03301065055001143525874293209920770968902766712091555585888497900746954960650250467206606180555417237e-14,
-    4.83760685817544104974918008895344303724730995799826121736221363185699872131913128162377233612731080e-16,
-    1.97953679111068662248975009738027259306277639199446521870174193132300321746057499270873882123310487500e-18,
-    3.6474655538315803148945976064548166497173172457990913939216649361282791779749929476922394573365077700e-21
+    3.3027840602875752797933229846633e-02,
+    4.07886754615175430254075890829e-03,
+    3.33527373172737242603705467099e-04,
+    1.88438744545771964992699112477e-05,
+    7.55565600673228187844472799772e-07,
+    2.18067488965933780610647422533e-08,
+    4.54329575207387209531041070804e-10,
+    6.76964099198340395235741216662e-12,
+    7.03301065055001143525874293210e-14,
+    4.83760685817544104974918008895e-16,
+    1.97953679111068662248975009738e-18,
+    3.64746555383158031489459760645e-21
 ])
 BETA_R   = float(_BETA[0])
 BETA_VEC = {i: float(v) for i, v in enumerate(_BETA[1:])}
 
-# ---------------------------------------------------------------------------
-# 1.  SymPy helper — fixed padding to avoid IndexError -----------------------
-# ---------------------------------------------------------------------------
 
 def evaluate_butcher_stability(a_vals, b_vals, s=15, beta_ref=BETA_R):
     """Quick pre‑screen: returns True if tableau passes the β test."""
@@ -88,12 +80,6 @@ def evaluate_butcher_stability(a_vals, b_vals, s=15, beta_ref=BETA_R):
     print("Pre‑screen passed" if passed else "Pre‑screen failed: sum roots too negative")
     return passed
 
-# ---------------------------------------------------------------------------
-# 2.  Pyomo model builder ---------------------------------------------------
-# ---------------------------------------------------------------------------
-
-
-
 
 def build_model():
     m       = pyo.ConcreteModel()
@@ -121,19 +107,21 @@ def build_model():
 
 
 def mycons(m, extra=None):
-    c = [0]
-    for r in range(1, m.s.value):
-        c.append(sum(m.a[r, i] for i in range(r)))
-    # linear order conditions
+    c = [0.0] + [sum(m.a[r,i] for i in range(r)) for r in range(1, m.s.value)]
+    # order‐1..3 conditions + row sums
     m.cons.add(sum(m.b[j] for j in m.cols) - 1 == 0)
-    m.cons.add(sum(m.b[j]*c[j] for j in m.cols if j>0) - 0.5 == 0)
-    m.cons.add(sum(m.b[j]*c[j]**2 for j in m.cols if j>0) - 1/3 == 0)
+    m.cons.add(sum(m.b[j]*c[j] for j in m.cols) - 0.5 == 0)
+    m.cons.add(sum(m.b[j]*c[j]**2 for j in m.cols) - 1/3 == 0)
     expr4 = sum(m.b[i]*m.a[i,j]*c[j] for i in range(2,m.s.value) for j in range(1,i))
     m.cons.add(expr4 - 1/6 == 0)
+    for i in range(1, m.s.value):
+        m.cons.add(sum(m.a[i,j] for j in range(i)) - c[i] == 0)
     if extra:
         m.cons.add(eval(extra))
 
+
 def mybets(m):
+    # internal‐stability objective + beta‐matching
     c, Q = [[],[]], []
     zval = -m.beta
     for i in m.rows:
@@ -142,158 +130,196 @@ def mybets(m):
         ibet = J+1
         iold, inew = (J-1)%2, J%2
         c[inew].clear()
-        for i in range(J): c[inew].append([None])
-        for i in range(J,m.s.value):
-            row=[]
+        for i in range(J):  c[inew].append([None])
+        for i in range(J, m.s.value):
+            row = []
             for j in range(i-J+1):
                 if J>1:
-                    row.append(sum(c[iold][i][k]*m.a[k,j] for k in range(j+1,i-J+2)))
+                    row.append(sum(c[iold][i][k]*m.a[k,j]
+                                   for k in range(j+1, i-J+2)))
                 else:
                     row.append(m.a[i,j])
             c[inew].append(row)
-        if ibet>m.order:
+        if ibet > m.order:
             expr = sum(m.b[i]*sum(c[inew][i]) for i in range(J,m.s.value)) - m.bet[ibet]
             m.cons.add(expr==0)
-            print("**beta**", ibet, float(m.bet[ibet]))
         for j in range(m.s.value-J):
-            Q[j] += sum(m.b[i]*c[inew][i][j] for i in range(J+j,m.s.value))*zval**(J+1)
+            Q[j] += sum(m.b[i]*c[inew][i][j] for i in range(J+j,m.s.value)) * zval**(J+1)
     L = m.s.value
-    m.obj = pyo.Objective(expr=sum(abs(Q[i])**L for i in m.rows)**(1/L))
+    m.obj = pyo.Objective(expr=(sum(abs(Q[i])**L for i in m.rows))**(1/L))
 
-# ---------------------------------------------------------------------------
-# 4.  Heuristic gen/mutation ------------------------------------------------
-# ---------------------------------------------------------------------------
 
 def _rand_factor(max_pow=3):
-    """
-    Return a random factor, possibly with exponentiation or negation:
-      - a[i,j] or a[i,j]**p
-      - b[k] or b[k]**p
-      - c[r] or c[r]**p
-    Each factor may be negated with 30% chance.
-    """
+    # choose one of the three variable types, never an int
     r = random.random()
     if r < 0.4:
-        i, j = random.choice(FREE_A)
-        p    = random.randint(1, max_pow)
-        base = f"m.a[{i},{j}]" + (f"**{p}" if p>1 else "")
+        i,j = random.choice(FREE_A)
+        base = f"m.a[{i},{j}]"
     elif r < 0.8:
         k = random.choice(FREE_B)
-        p = random.randint(1, max_pow)
-        base = f"m.b[{k}]" + (f"**{p}" if p>1 else "")
+        base = f"m.b[{k}]"
     else:
         r_idx = random.randint(0, S-1)
-        p     = random.randint(1, max_pow)
-        base  = f"c[{r_idx}]" + (f"**{p}" if p>1 else "")
-    # optional negation
+        base  = f"c[{r_idx}]"
+    # optionally add a power
     if random.random() < 0.3:
-        return f"-({base})"
+        p = random.randint(2, max_pow)
+        base += f"**{p}"
     return base
 
 
+
 def expression(min_terms=1, max_terms=5, max_factors=3):
-    """
-    Return a random heuristic constraint composed of up to five terms,
-    each term the product of up to three random factors, linked by + or -.
-    """
-    lhs_i, lhs_j = random.choice(FREE_A)
+    lhs_i,lhs_j = random.choice(FREE_A)
     n_terms      = random.randint(min_terms, max_terms)
     rhs_terms    = []
     for _ in range(n_terms):
-        n_factors = random.randint(1, max_factors)
-        factors   = [_rand_factor(max_pow=3) for _ in range(n_factors)]
+        factors = [_rand_factor() for _ in range(random.randint(1, max_factors))]
         rhs_terms.append(" * ".join(factors))
-
-    # build signed expression
     expr = f"m.a[{lhs_i},{lhs_j}] == {rhs_terms[0]}"
     for term in rhs_terms[1:]:
-        sign = random.choice([' + ', ' - '])
-        expr += sign + term
+        expr += random.choice([" + ", " - "]) + term
     return expr
 
 
-def mutate_expression(expr, p=0.3):
-    """
-    Randomly tweak a term or factor in the given heuristic expression.
-    """
-    lhs, rhs = expr.split('==')
-    # split by + or - while preserving signs
-    tokens = []
-    cur    = ''
-    for ch in rhs:
-        if ch in '+-' and cur.strip():
-            tokens.append(cur.strip())
-            tokens.append(ch)
-            cur = ''
-        else:
-            cur += ch
-    tokens.append(cur.strip())
+import random
 
-    # mutate a random factor
-    factors = [tok for tok in tokens if '*' in tok or tok.startswith('m.') or tok.startswith('c[')]
-    if random.random() < p and factors:
-        old = random.choice(factors)
-        new = _rand_factor(max_pow=3)
-        rhs = rhs.replace(old, new, 1)
-    return lhs + '== ' + rhs
+import random, re
 
-# ---------------------------------------------------------------------------
-# 5.  Main search loop ------------------------------------------------------
-# ---------------------------------------------------------------------------
-def main(seed=42,n_iter=100_000,stable_target=10):
+def mutate_expression(expr, p_term=0.2, p_factor=0.8, min_terms=1, max_terms=5):
+    """
+    Mutate either:
+      • the list of terms (with probability p_term), by adding/removing one, or
+      • a single factor inside one term (with probability p_factor).
+    Ensures no empty factors ever slip through.
+    """
+    lhs, rhs = expr.split("==")
+    lhs = lhs.strip()
+    rhs = rhs.strip()
+
+    # 1) split out terms with their leading +/-  
+    parts = re.findall(r'([+-]?\s*[^+-]+)', rhs)
+    terms = [p.strip() for p in parts]
+
+    def rebuild(terms):
+        out = terms[0].lstrip('+ ').strip()
+        for t in terms[1:]:
+            sign = '+' if t[0] not in '+-' else t[0]
+            body = t.lstrip('+- ').strip()
+            out += f" {sign} {body}"
+        return out
+
+    new_terms = terms.copy()
+    if random.random() < p_term:
+        # TERM-level mutation
+        if len(new_terms) > min_terms and random.random() < 0.5:
+            new_terms.pop(random.randrange(len(new_terms)))
+        elif len(new_terms) < max_terms:
+            i,j = random.choice(FREE_A)
+            nf = random.randint(1,3)
+            factors = [_rand_factor() for _ in range(nf)]
+            term = " * ".join(factors)
+            sign = random.choice(['+','-'])
+            new_terms.insert(random.randrange(len(new_terms)+1), f"{sign} {term}")
+    else:
+        # FACTOR-level mutation
+        idx = random.randrange(len(new_terms))
+        term = new_terms[idx]
+        sign = term[0] if term[0] in '+-' else ''
+        body = term[1:].strip() if sign else term
+        factors = [f.strip() for f in body.split('*') if f.strip()]
+        fi = random.randrange(len(factors))
+        factors[fi] = _rand_factor()
+        new_body = " * ".join(factors)
+        new_terms[idx] = f"{sign} {new_body}"
+
+    # Rebuild and return
+    new_rhs = rebuild(new_terms)
+    return f"{lhs} == {new_rhs}"
+
+
+
+
+
+def main(seed=42, n_iter=100000, stable_target=10, max_mutations=5):
     random.seed(seed)
-    solver=SolverFactory('ipopt',executable='ipopt')
+
+    # ────── FIX #1: initialise FREE_A/FREE_B/S before calling expression()
+    _ = build_model()
+
+    solver = SolverFactory('ipopt')
     solver.options.update({
-        'linear_solver':'ma27','tol':1e-6,'acceptable_tol':1e-6,
-        'honor_original_bounds':'yes','bound_relax_factor':1e-6,
-        'max_iter':             477 
+        'linear_solver':'ma27',
+        'tol':1e-6,
+        'acceptable_tol':1e-6,
+        'honor_original_bounds':'yes',
+        'bound_relax_factor':1e-6,
+        'max_iter':477
     })
 
-    stable_bank=[]; obj_best=1e10
+    stable_bank = []
     for it in range(1, n_iter+1):
-        print(f"Iteration {it}: Generating new heuristic")
-        if len(stable_bank)>=stable_target:
-            print(f"Found {stable_target} stable heuristics → stopping")
+        if len(stable_bank) >= stable_target:
+            print(f"Reached {stable_target} stable heuristics; done.")
             break
-        m=build_model(); init=1/m.s.value
-        # random init coefficients
-        for i in range(1,m.s.value):
-            for j in range(i): m.a[i,j].value=random.uniform(0,init)
-        for j in m.cols: m.b[j].value=random.uniform(0,init)
-        hstr=expression();
-        print(f"Trying heuristic: {hstr}")
-        mycons(m,hstr)
-        a_vals=[m.a[i,j].value for i in range(1,m.s.value) for j in range(i)]
-        b_vals=[m.b[j].value for j in m.cols]
-        # pre-screen stability
-        if evaluate_butcher_stability(a_vals,b_vals):
-            stable_bank.append(hstr)
-            print(f"✔ Pre‑screen stable #{len(stable_bank)}: {hstr}")
-        else:
-            print(f"✖ Pre‑screen failed for: {hstr}")
-            continue  # skip solver if fails pre-screen
-        # attempt optimization
-        try:
-            res=solver.solve(m,tee=False)
-            if res.solver.status==SolverStatus.ok and res.solver.termination_condition==TerminationCondition.optimal:
-                val=m.obj()
-                print(f"✔ IPOPT optimized obj={val:.3e}")
-                if val<obj_best:
-                    obj_best=val
-                    best_json=json.dumps(pyo.json_loads(pyo.json_save(model=m)))
-            else:
-                print(f"✖ IPOPT did not converge: status={res.solver.status}")
-        except Exception as e:
-            print(f"✖ IPOPT failed: {e}")
 
-    print("Best objective value:",obj_best)
-    if stable_bank:
-        with open('stable_heuristics.json','w') as f: json.dump(stable_bank,f,indent=2)
-        print("Stable heuristics saved → stable_heuristics.json")
+        best_obj = None
+        h        = expression()
+        for tr in range(1, max_mutations+1):
+            print(f"[Iter {it} – try {tr}/{max_mutations}]  heuristic: {h}")
+            m = build_model()
+
+            # random initialisation
+            init = 1.0/m.s.value
+            for i in range(1,m.s.value):
+                for j in range(i):
+                    m.a[i,j].value = random.uniform(0,init)
+            for j in m.cols:
+                m.b[j].value   = random.uniform(0,init)
+
+            # add this heuristic constraint
+            mycons(m, extra=h)
+
+            # pre-screen
+            a_vals = [m.a[i,j].value for i in range(1,m.s.value) for j in range(i)]
+            b_vals = [m.b[j].value   for j in m.cols]
+            if not evaluate_butcher_stability(a_vals,b_vals):
+                print("  ✖ pre-screen failed, mutating…")
+                h = mutate_expression(h)
+                continue
+
+            # solve
+            res = solver.solve(m, tee=False)
+            if (res.solver.status == SolverStatus.ok
+             and res.solver.termination_condition == TerminationCondition.optimal):
+                val = pyo.value(m.obj)
+                print(f"  ✔ IPOPT obj = {val:.3e}")
+                best_obj = val
+                stable_bank.append(h)
+                break
+            else:
+                print("  ✖ IPOPT failed, mutating…")
+                h = mutate_expression(h)
+
+        if best_obj is None:
+            print(f"Iteration {it} gave up after {max_mutations} tries.")
+        else:
+            print(f"Iteration {it} succeeded with obj={best_obj:.3e}")
+
+    print("=== Done. Stable heuristics: ===")
+    print("\n".join(stable_bank))
+    with open("stable_heuristics.json","w") as f:
+        json.dump(stable_bank, f, indent=2)
+
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser()
-    p.add_argument('--seed',type=int,default=412)
-    p.add_argument('--iter',type=int,default=100000)
-    p.add_argument('--target',type=int,default=10)
-    args=p.parse_args(); main(seed=args.seed,n_iter=args.iter,stable_target=args.target)
+    p = argparse.ArgumentParser()
+    p.add_argument('--seed',   type=int, default=42)
+    p.add_argument('--iter',   type=int, default=1000)
+    p.add_argument('--target', type=int, default=10)
+    p.add_argument('--mut',    type=int, default=5)
+    args = p.parse_args()
+    main(seed=args.seed,
+         n_iter=args.iter,
+         stable_target=args.target,
+         max_mutations=args.mut)
