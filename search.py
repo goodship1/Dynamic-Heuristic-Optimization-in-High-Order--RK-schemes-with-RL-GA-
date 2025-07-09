@@ -1,6 +1,6 @@
 from __future__ import division
 """
-Low‑storage Runge–Kutta (LSRK) search                  
+Runge–Kutta (ESRK) search                  
 ======================================================
 * **Exploration**  – every outer loop we create a brand‑new random heuristic
   constraint (or mutate an older one) and random starting coefficients.
@@ -18,6 +18,9 @@ This file is self‑contained: run it with
 
 and you should reproduce the numbers reported in the manuscript on any
 machine with IPOPT & MA27.
+
+For the huestrics in the paper a stand alone notebook with results and tableaus 
+will be provided this will contain all info needed and notebook to run them 
 """
 
 # ---------------------------------------------------------------------------
@@ -116,9 +119,6 @@ def build_model():
     mybets(m)
     return m
 
-# ---------------------------------------------------------------------------
-# 3.  Constraints & Objective (identical logic) -----------------------------
-# ---------------------------------------------------------------------------
 
 def mycons(m, extra=None):
     c = [0]
