@@ -1,20 +1,43 @@
 # Dynamic Heuristic Optimisation in High-Order Runge–Kutta Schemes
 
-This repository contains all the code and data accompanying the paper:
+This repository contains all code, data, and validation supporting the paper:
 
-> **Dynamic Heuristic Optimisation in High-Order Runge–Kutta Schemes using Reinforcement Learning and Genetic Algorithms**  
->
-
---- 
-
-## 📄 Overview
-
-We present a novel pipeline for discovering and validating high-stage, third-order Runge–Kutta (RK) methods with extended stability regions:
-
-1. **Symbolic verification** that our heuristics scale from 15 to 30 stages (in increments of 3) with only polynomial cost- Run sweep.py in the Symbolic verification file
-     In the file Symbolic verification this shows that all the huestrics can be scaled and dont break the third order RK order condtions.
-
-3. **Numerical validation** on 1D and 2D Brusselator PDEs, demonstrating clean third-order convergence and enlarged stability regions for each huestric from the paper, has only the file with the huestric as the file name with a notebook of code to verify the order conditions are met numerically, providing third-order convergence, plus Stability and internal amplification studies, along with the IPOPT code with the huestric, which can be used to generate the tableaus. 
+> **Dynamic Heuristic Optimisation in High-Order Runge–Kutta Schemes using Reinforcement Learning and Genetic Algorithms**
 
 ---
 
+## 📄 Overview
+
+This project introduces a novel pipeline for discovering, generating, and validating high-stage third-order Runge–Kutta (RK) schemes with extended stability regions and new heuristic constraints.
+
+---
+
+## 🔬 What’s Included
+
+**1. Symbolic Verification**  
+- All heuristics are *symbolically verified* to scale from 15 to 30 stages (increments of 3) at only polynomial cost.
+- **How to run:** See `sweep.py` in the `Symbolic_verification` folder.  
+- **What it does:** Demonstrates every heuristic passes the *third-order* RK order conditions under symbolic manipulation.
+
+**2. Numerical Validation**  
+- For each heuristic, notebooks are provided:
+  - Validate the method on 1D/2D Brusselator PDEs
+  - Confirm third-order convergence numerically
+  - Demonstrate extended stability regions
+- Each notebook is named by the heuristic tested and contains code to **numerically verify all third-order order conditions** for that scheme.
+- *IPOPT* code for tableaus is included for method generation.
+
+**3. Residual-based Numerical Checker**  
+- All heuristics are checked using `checker.py`, which prints for each scheme:
+    - Each third-order condition (value, residual, pass/fail)
+    - Residuals are all confirmed to be below 1e-12 (see output in appendix or run `checker.py`)
+- This ensures full transparency and immediate reproducibility of the third-order validity for every scheme in the repo.
+
+---
+
+## 🏃‍♂️ Quick Start
+
+1. **Symbolic Verification:**  
+   Run  
+   ```bash
+   python Symbolic_verification/sweep.py
