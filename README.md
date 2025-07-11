@@ -30,7 +30,7 @@ This project introduces a novel pipeline for discovering, generating, and valida
 **3. Residual-based Numerical Checker**  
 - All heuristics are checked using `checker.py`, which prints for each scheme:
     - Each third-order condition (value, residual, pass/fail)
-    - Residuals are all confirmed to be below 1e-12 (see output in appendix or run `checker.py`)
+    - Residuals are all confirmed to be below 1e-10 (see output in appendix or run `checker.py`)
 - This ensures full transparency and immediate reproducibility of the third-order validity for every scheme in the repo.
 
 ---
