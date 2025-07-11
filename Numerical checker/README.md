@@ -12,6 +12,7 @@ This folder contains code and data for **numerical validation** of all heuristic
 - **Reports residuals**: For each order condition, the checker reports the computed value, the theoretical target, and the numerical residual (error).
 - **One-click verification**: Output makes it immediately clear that all schemes strictly satisfy the third-order accuracy requirements (residuals typically < 1e-10).
 - **Checks huestrics** : Verifies that each huestric is  in the Butcher tableau, extra sanity check for reviewers.
+- **Stability polynomial**: Each of the huestrics has a stability polynomial that is checked through the stable checker to make sure the huestrics are able to produce the correct stability.
 
 ---
 
