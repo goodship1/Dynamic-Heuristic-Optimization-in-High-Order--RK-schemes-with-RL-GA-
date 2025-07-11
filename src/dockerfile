@@ -1,0 +1,12 @@
+FROM distcomp/solvers
+RUN mkdir -p /app
+RUN pip install cloudpickle
+RUN pip install sympy
+COPY search.py /app/
+
+# Set the working directory to /app
+WORKDIR /app
+
+# Set the entry point to run the gg6.py script
+CMD ["python", "search.py"]
+
