@@ -19,3 +19,7 @@ This folder contains code and data for **numerical validation** of all heuristic
 1. **Run the checker**
    ```bash
    python checker.py
+2 . Stable checker this checks that each heuristic is stable.
+   ```bash
+   python stable_check.py
+   
