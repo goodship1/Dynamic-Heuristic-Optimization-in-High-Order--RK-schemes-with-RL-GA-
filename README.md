@@ -41,3 +41,9 @@ This project introduces a novel pipeline for discovering, generating, and valida
    Run  
    ```bash
    python Symbolic_verification/sweep.py
+2. **Numerical checker** for heuristics from the paper, this ensures that all order conditions are met to a high tolerance.
+     Run
+   
+   ```bash
+   
+       python Numerical Checker/checker.py
