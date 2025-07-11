@@ -33,6 +33,9 @@ This project introduces a novel pipeline for discovering, generating, and valida
     - Residuals are all confirmed to be below 1e-10 (see output in appendix or run `checker.py`)
 - This ensures full transparency and immediate reproducibility of the third-order validity for every scheme in the repo.
 
+  **4. Coefficients for the schemes that have been found all with raw convergence metrics ODE BRUSS, and PDE BRUSS. are all provided**
+  
+
 ---
 
 ## 🏃‍♂️ Quick Start
