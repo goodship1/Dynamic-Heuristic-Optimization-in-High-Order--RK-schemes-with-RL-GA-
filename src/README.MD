@@ -1,1 +1,1 @@
-
+to run clone the repo and docker file which contains the search run the docker file which will install all the IPOPT librarys which installs all of the solvers which are needed to run the search.py the search can take a while to find valid candaiates to test but will find solutions all tableaus which the heustrics have been produced in the paper a total of 23 have been found this was done quite a few runs.
